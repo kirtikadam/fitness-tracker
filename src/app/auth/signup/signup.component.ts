@@ -9,6 +9,7 @@ import { AuthService } from '../auth.service';
 })
 export class SignupComponent implements OnInit {
   maxDate;
+
   constructor(private authService: AuthService) { }
 
   ngOnInit(): void {
