@@ -4,7 +4,10 @@ import { Injectable } from "@angular/core";
 import { AngularFirestore } from "@angular/fire/firestore";
 import { map } from 'rxjs/operators';
 import { Subscription } from 'rxjs';
-import { UIService } from "../shared/ui-service";
+import { UIService } from "../shared/ui.service";
+import { Store } from '@ngrx/store';
+import * as fromRoot from '../app.reducer';
+import * as UI from '../shared/ui.actions';
 
 @Injectable()
 export class TrainingService {
@@ -15,32 +18,41 @@ export class TrainingService {
   private runningExercise: Exercise;
   private firestoreSubscriptions: Subscription[] = [];
 
-  constructor(private firestore: AngularFirestore, private uiService: UIService) { }
+  constructor(
+    private firestore: AngularFirestore,
+    private uiService: UIService,
+    private store: Store<fromRoot.State>
+  ) { }
 
   fetchAvailableExercises() {
-    this.uiService.loadingStateChanged.next(true);
-    this.firestoreSubscriptions.push(this.firestore.collection('availableExercises').snapshotChanges()
-      .pipe(map(docArray => {
-        return docArray.map(doc => {
-          return {
-            id: doc.payload.doc.id,
-            name: doc.payload.doc.data()['name'],
-            duration: doc.payload.doc.data()['duration'],
-            calories: doc.payload.doc.data()['calories'],
-            // ...doc.payload.doc.data() as Exercise
-          }
-        });
-      })).subscribe((exercises: Exercise[]) => {
-        this.uiService.loadingStateChanged.next(false);
-        this.availableExercises = exercises;
-        this.exercisesChanged.next([...this.availableExercises])
-      }, error => {
-        this.uiService.loadingStateChanged.next(false);
-        this.uiService.showSnackbar("Fetching exercises failed. Please try again", null, {
-          duration: 3000
-        });
-        this.exercisesChanged.next(null);
-      }));
+    // this.uiService.loadingStateChanged.next(true);
+    this.store.dispatch(new UI.StartLoading());
+    this.firestoreSubscriptions.push(
+      this.firestore.collection('availableExercises')
+        .snapshotChanges()
+        .pipe(map(docArray => {
+          return docArray.map(doc => {
+            return {
+              id: doc.payload.doc.id,
+              name: doc.payload.doc.data()['name'],
+              duration: doc.payload.doc.data()['duration'],
+              calories: doc.payload.doc.data()['calories'],
+              // ...doc.payload.doc.data() as Exercise
+            }
+          });
+        })).subscribe((exercises: Exercise[]) => {
+          // this.uiService.loadingStateChanged.next(false);
+          this.store.dispatch(new UI.StopLoading());
+          this.availableExercises = exercises;
+          this.exercisesChanged.next([...this.availableExercises]);
+        }, error => {
+          // this.uiService.loadingStateChanged.next(false);
+          this.store.dispatch(new UI.StopLoading());
+          this.uiService.showSnackbar("Fetching exercises failed. Please try again", null, {
+            duration: 3000
+          });
+          this.exercisesChanged.next(null);
+        }));
   }
 
   startExercise(selectedId: string) {
